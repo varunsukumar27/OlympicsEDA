@@ -1,0 +1,242 @@
+---
+title: "Olympics EDA"
+author: "Varun Sukumar"
+date: "August 6, 2018"
+output: 
+  html_document:
+      number_sections: true
+      toc: true
+      toc_depth: 4
+      code_folding: hide
+      theme: cosmo
+      highlight: tango
+---
+
+# Introduction to the Olympics:
+
+<center><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Olympic_rings_without_rims.svg/1200px-Olympic_rings_without_rims.svg.png" style="width: 600px;"/></center>
+
+
+The modern Olympic Games or Olympics are leading international sporting events featuring summer and winter sports competitions in which thousands of athletes from around the world participate in a variety of competitions. The Olympic Games are considered the world's foremost sports competition with more than 200 nations participating. The Olympic Games are held every four years, with the Summer and Winter Games alternating by occurring every four years but two years apart.
+
+The evolution of the Olympic Movement during the 20th and 21st centuries has resulted in several changes to the Olympic Games. Some of these adjustments include the creation of the Winter Olympic Games for snow and ice sports, the Paralympic Games for athletes with a disability, the Youth Olympic Games for athletes aged 14 to 18, the five Continental games (Pan American, African, Asian, European, and Pacific), and the World Games for sports that are not contested in the Olympic Games. The Deaflympics and Special Olympics are also endorsed by the IOC. The IOC has had to adapt to a variety of economic, political, and technological advancements. As a result, the Olympics has shifted away from pure amateurism, as envisioned by Coubertin, to allowing participation of professional athletes. The growing importance of mass media created the issue of corporate sponsorship and commercialisation of the Games. World wars led to the cancellation of the 1916, 1940, and 1944 Games. Large boycotts during the Cold War limited participation in the 1980 and 1984 Games. The latter, however, attracted 140 National Olympic Committees, which was a record at the time.
+
+For more information refer [Olympics' official page](https://www.olympic.org/)
+
+# Introduction about the Data:
+
+This is a historical dataset on the modern Olympic Games, including all the Games from Athens 1896 to Rio 2016. I scraped this data from www.sports-reference.com in May 2018. The R code I used to scrape and wrangle the data is on GitHub. I recommend checking my kernel before starting your own analysis.
+
+# Content:
+
+The file athlete_events.csv contains 271116 rows and 15 columns. Each row corresponds to an individual athlete competing in an individual Olympic event (athlete-events). The columns are:
+
+1. ID - Unique number for each athlete
+2. Name - Athlete's name
+3. Sex - M or F
+4. Age - Integer
+5. Height - In centimeters
+6. Weight - In kilograms
+7. Team - Team name
+8. NOC - National Olympic Committee 3-letter code
+9. Games - Year and season
+10. Year - Integer
+11. Season - Summer or Winter
+12. City - Host city
+13. Sport - Sport
+14. Event - Event
+15. Medal - Gold, Silver, Bronze, or NA
+
+# Loading the dataset:
+```{r}
+atheletes <- read.csv("athlete_events.csv", stringsAsFactors = F)
+regions <- read.csv("noc_regions.csv", stringsAsFactors = F)
+```
+
+# Loading the required libraries:
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+# Initial Exploration of the dataset:
+```{r}
+glimpse(atheletes)
+```
+
+```{r}
+glimpse(regions)
+```
+
+## Analysis by sex:
+
+### Rough Numbers:
+The first part of our analysis will be helpful in understanding how the Olympics has evolved over the years. How have men and women been allowed to participate in the competitions overtime.
+
+```{r}
+df <- atheletes %>%
+  group_by(Season, Sex) %>%
+  summarise(Count = n()) %>%
+  mutate(Percentage = round(Count*100 / sum(Count))) 
+  
+df %>%   
+ggplot(aes(x=Season, y=Percentage, fill = Sex)) + geom_bar(stat='identity',position=position_dodge()) +
+        ggtitle("Total number of transfers in a window(2007-2017)") +
+        geom_label(label=df$Percentage, position = position_dodge(0.9)) +
+        theme_minimal() 
+        
+```
+
+During the winter and the summer the percentage and women have remained the same.
+
+### By trend:
+
+#### Overall trend:
+As the olymics progressed through the ages the number of people participating in it would have increased, which meant that the number of men and women participating in the olympics grew.
+
+```{r}
+atheletes %>%
+  group_by(Year, Season) %>%
+  summarise(NumberOfParticipants = n()) %>%
+  ggplot(aes(x = Year, y = NumberOfParticipants, group = Season)) +
+  geom_line(aes(color = Season)) +
+  geom_point(aes(color = Season)) +
+  labs(x = "Year", y = "Number of Participants", title = "Number of participants in the olympics overtime")+
+  theme_minimal()
+```
+
+The number of participants in the olympics have grown overtime. It is also obvious that the number of participants in the summer olympics are more than that of the winter olympics.
+
+#### Trend of sex ratio:
+```{r}
+groupMale <- atheletes %>%
+              filter(Sex == "M") %>%
+              group_by(Year, Season) %>%
+              summarise(Number_Of_Men = n())
+
+groupFemale <- atheletes %>%
+              filter(Sex == "F") %>%
+              group_by(Year, Season) %>%
+              summarise(Number_Of_Women = n())
+
+group <- groupMale %>%
+          left_join(groupFemale) %>%
+          mutate(Sex_Ratio = Number_Of_Men/Number_Of_Women)
+
+group$Sex_Ratio[is.na(group$Sex_Ratio)] <- 175
+
+p1 <- group %>%
+    ggplot(aes(x = Year, y= Sex_Ratio, group = Season)) +
+    geom_line(aes(color = Season)) +
+    geom_point(aes(color = Season)) +
+    labs(x = "Year", y = "Sex Ratio", title = "Sex Ratio in Olympics through the years") +
+    theme_minimal()
+
+p2 <- group %>%
+    filter(Year>1927) %>%
+    ggplot(aes(x = Year, y= Sex_Ratio, group = Season)) +
+    geom_line(aes(color = Season)) +
+    geom_point(aes(color = Season)) +
+    labs(x = "Year", y = "Sex Ratio", title = "Sex Ratio in Olympics through the years after 1927") +
+    theme_minimal()
+
+cowplot::plot_grid(p1,p2, ncol = 1, 
+          align = 'h', axis = 'l')
+
+```
+When the olympics started no women participated in the Olympics. In 1900 women started participating in the olympics. As years passed the sex ratio i.e. the ratio of men to women became smaller. After 2000 the ratio started to move towards 1, which means that the olympics now are more diverse than they used to be, which great.
+
+## Analysis by Age
+
+Age is something might have changed from the olymipics started.
+Hypothesis: The participants during the 1900 of the olympics had a median age greater than the median age of the participants during the 2000's.
+
+### Age Density plots
+
+```{r}
+atheletes$Age[is.na(atheletes$Age)] <- median(atheletes$Age, na.rm = T)
+```
+
+```{r}
+cat("The median age of the athletes in the modern olympics is", median(atheletes$Age))
+```
+```{r}
+cat("The median age of the male athletes in the modern olympics is", median(atheletes$Age[atheletes$Sex == "M"]))
+```
+```{r}
+cat("The median age of the female athletes in the modern olympics is", median(atheletes$Age[atheletes$Sex == "F"]))
+```
+The median age for female athletes was lesser than that of median age of male athletes.
+
+```{r}
+# Filling the missing ages with median values.
+
+p1 <- atheletes %>%
+      ggplot(aes(x = Age)) +
+      geom_density(color = "black", fill = "tomato") +
+      labs(x = "Age", title = "Distribution of Age") +
+      theme_minimal()
+
+p2 <- atheletes %>%
+      ggplot(aes(x=Age, fill=Sex)) +
+      geom_density(alpha=0.4) +
+      labs(x = "Age", title = "Distribution of Age by Sex") +
+      theme_minimal()
+
+cowplot::plot_grid(p1,p2, ncol = 1, 
+          align = 'h', axis = 'l')
+```
+
+### Age of athletes over the years.
+```{r}
+atheletes %>%
+  group_by(Year, Sex) %>%
+  summarise(Median_Age = median(Age)) %>%
+  ggplot(aes(x = Year, y = Median_Age, Group = Sex)) +
+  geom_line(aes(color = Sex)) +
+  geom_point(aes(color = Sex)) + 
+  labs( x = "Year", y = "Medain age of Athletes", title = "Median age of Male and Female athletes over the years")+
+  theme_minimal()
+```
+
+The median age of men and women participating in the olymipics has increased a bit after the 1980's.
+
+## Analysis by Team:
+
+Teams here refer to the countries and the different atletic clubs that have participated in the olympics over the years.
+```{r}
+cat("The total number of teams that have paricipated in the olympics are", length(unique(atheletes$Team)))
+```
+```{r}
+atheletes <- atheletes %>%
+              left_join(regions, by = "NOC")
+```
+
+We have now joined athletes dataset with the regions dataset. I would like to analyze the dataset based on the National Olympics Committee rather than the teams.
+```{r}
+  cat("The total number of National Olympics Committees that have paricipated in the olympics are", length(unique(atheletes$region)))
+```
+```{r}
+atheletes %>%
+  filter(Medal != "<NA>") %>%
+  group_by(region) %>%
+  summarise(Medal_Tally = length(Medal))%>%
+  arrange(desc(Medal_Tally)) %>%
+  ungroup() %>%
+  mutate(region = reorder(region,Medal_Tally)) %>%
+  top_n(10) %>%
+  ggplot(aes(x = region,y = Medal_Tally)) +
+    geom_bar(stat='identity',colour="white", fill = "tomato") +
+    geom_text(aes(x = region, y = .1, label = paste0("(",round(Medal_Tally,2),")",sep="")),
+              hjust=0, vjust=.5, size = 4, colour = 'black',
+              fontface = 'bold') +
+    theme(plot.title = element_text(size=10),
+          axis.title = element_text(size=10),
+          axis.text = element_text(size=10)) +
+    labs(x = 'Country', 
+         y = 'Number of Medals'
+         ) +
+    coord_flip() + 
+    theme_bw()
+```
+
